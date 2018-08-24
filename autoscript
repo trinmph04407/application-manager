@@ -1,0 +1,68 @@
+###########################
+## Shell script to clone a list of github repositories and run `mvn clean install` on each one of them
+##
+## Usage: put a file called `repos.txt` in the folder of the script containing the repository URLs, line by line:
+##
+##https://github.com/pulse00/Composer-Eclipse-Plugin.git
+##git@github.com:pulse00/Symfony-2-Eclipse-Plugin.git
+##etc
+###########################
+
+TOMCAT_SERVER='/app/soft-302/apache-tomcat-8.0.52'
+
+
+cwd=`pwd`
+
+# Read repos file
+while read line
+do
+  projects+=( "$line" )
+done < $cwd/repos.txt
+
+# Clone & Build all projects
+for project in "${projects[@]}"
+do
+  echo "==================================== $project ============================================"
+  echo "==> Project Link: $project"
+  name=$(echo $project | awk -F/ '{print $5}')
+  name=${name%.git}
+  fullPath="$cwd/$name"
+  echo "==> Porject name: $name"
+  echo "==> Project fullapth: $fullPath"
+
+  # If project did not existed, clonet it from git server
+  if [ ! -d "$fullPath" ]; then
+   echo "==> Clone project: $project"
+   git clone $project
+  fi
+
+  # Build project with maven command
+  cd $fullPath
+  mvn package
+
+  # Rename war file
+  mv "$fullPath/target/$name-0.0.1-SNAPSHOT.war" "$fullPath/target/$name.war"
+
+  # Come back to parent directory
+  cd $cwd
+
+done
+
+
+# Stop tomcat server
+echo "======================================== DEPLOY PROJECT ======================================="
+#echo "==> Stop tomcat server: $TOMCAT_SERVER"
+#sh $TOMCAT_SERVER/bin/shutdown.sh
+
+# Remove all old deployed project
+echo "==> Remove old projects"
+rm -rf $TOMCAT_SERVER/webapps/*.war
+
+# Copy built project into tomcat server
+echo "==> Copy new projects"
+cp $cwd/*/target/*.war $TOMCAT_SERVER/webapps/
+
+# Start tomcat server again
+#echo "==> Start tomcat server $TOMCAT_SERVER"
+#sh $TOMCAT_SERVER/bin/startup.sh
+                                      
